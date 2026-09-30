@@ -1,1 +1,54 @@
+name: Build StickerFlow APK
 
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'StickerFlow_Android_CloudBuild.zip'
+      - '.github/workflows/main.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar proyecto
+        uses: actions/checkout@v4
+
+      - name: Extraer proyecto Android
+        run: |
+          rm -rf build-src
+          mkdir build-src
+          unzip -q StickerFlow_Android_CloudBuild.zip -d build-src
+          ROOT_DIR=$(find build-src -maxdepth 2 -name settings.gradle.kts -print -quit | xargs -r dirname)
+          if [ -z "$ROOT_DIR" ]; then
+            echo "settings.gradle.kts no encontrado"
+            exit 1
+          fi
+          echo "ROOT_DIR=$ROOT_DIR" >> "$GITHUB_ENV"
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Instalar Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Compilar APK
+        working-directory: ${{ env.ROOT_DIR }}
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: StickerFlow-APK
+          path: ${{ env.ROOT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
